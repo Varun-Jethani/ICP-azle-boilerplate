@@ -2,6 +2,7 @@
   "canisters": {
      "buy_me_coffee": {
         "type": "custom",
+
         "ts": "src/index.ts",
         "candid": "src/index.did",
         "root":"src",
@@ -9,5 +10,6 @@
         "wasm": ".azle/buy_me_coffee/buy_me_coffee.wasm"
      }
         
+
   }
 }

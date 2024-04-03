@@ -22,7 +22,9 @@ type DonationPayload = Record<{
 const donationStorage = new StableBTreeMap<string, DonationRecord>(0, 44, 1024);
 
 // Create a map to store donor and receiver names for each donation
+
 const donationNamesStorage = new StableBTreeMap<string, Record<{ donorName: string; receiverName: string }>>(0, 44, 1024);
+
 
 $update;
 export function makeDonation(payload: DonationPayload): Result<DonationRecord, string> {
@@ -61,6 +63,7 @@ export function getRecentDonations(limit: number): Result<Vec<DonationRecord>, s
 // Function to get a specific donation by id
 $query;
 export function getDonation(id: string): Result<DonationRecord, string> {
+
     const donationOpt = donationStorage.get(id);
     
     // Check if donationOpt is Some and not undefined
@@ -70,10 +73,12 @@ export function getDonation(id: string): Result<DonationRecord, string> {
     } else {
         return Result.Err(`Donation with id=${id} not found`);
     }
+
 }
 
 // Function to get donor and receiver names for a donation
 $query;
+
 export function getDonationNames(id: string): Result<Record<{ donorName: string; receiverName: string }>, string> {
     const namesOpt = donationNamesStorage.get(id);
     
@@ -85,6 +90,7 @@ export function getDonationNames(id: string): Result<Record<{ donorName: string;
         return Result.Err(`Donation names for id=${id} not found`);
     }
 }
+
 
 
 

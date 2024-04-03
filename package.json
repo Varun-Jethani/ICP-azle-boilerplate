@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "description": "Internet Computer message board application",
   "dependencies": {
+
     "@dfinity/agent": "^0.21.4",
     "@dfinity/candid": "^0.21.4",
     "azle": "^0.17.1",
@@ -15,5 +16,6 @@
   "devDependencies": {
     "@types/express": "^4.17.21",
     "@types/uuid": "^9.0.8"
+
   }
 }
