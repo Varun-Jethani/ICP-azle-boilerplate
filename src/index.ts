@@ -22,7 +22,9 @@ type DonationPayload = Record<{
 const donationStorage = new StableBTreeMap<string, DonationRecord>(0, 44, 1024);
 
 // Create a map to store donor and receiver names for each donation
-const donationNamesStorage = new StableBTreeMap<string, { donorName: string; receiverName: string }>(0, 44, 1024);
+
+const donationNamesStorage = new StableBTreeMap<string, Record<{ donorName: string; receiverName: string }>>(0, 44, 1024);
+
 
 $update;
 export function makeDonation(payload: DonationPayload): Result<DonationRecord, string> {
@@ -61,20 +63,37 @@ export function getRecentDonations(limit: number): Result<Vec<DonationRecord>, s
 // Function to get a specific donation by id
 $query;
 export function getDonation(id: string): Result<DonationRecord, string> {
-    return match(donationStorage.get(id), {
-        Some: (record) => Result.Ok(record),
-        None: () => Result.Err(`Donation with id=${id} not found`)
-    });
+
+    const donationOpt = donationStorage.get(id);
+    
+    // Check if donationOpt is Some and not undefined
+    if ("Some" in donationOpt && donationOpt.Some !== undefined) {
+        const donation = donationOpt.Some as DonationRecord; // Type assertion
+        return Result.Ok(donation);
+    } else {
+        return Result.Err(`Donation with id=${id} not found`);
+    }
+
 }
 
 // Function to get donor and receiver names for a donation
 $query;
-export function getDonationNames(id: string): Result<{ donorName: string; receiverName: string }, string> {
-    return match(donationNamesStorage.get(id), {
-        Some: (names) => Result.Ok(names),
-        None: () => Result.Err(`Donation names for id=${id} not found`)
-    });
+
+export function getDonationNames(id: string): Result<Record<{ donorName: string; receiverName: string }>, string> {
+    const namesOpt = donationNamesStorage.get(id);
+    
+    // Check if namesOpt is Some and not undefined
+    if ("Some" in namesOpt && namesOpt.Some !== undefined) {
+        const names = namesOpt.Some as { donorName: string; receiverName: string }; // Type assertion
+        return Result.Ok(names);
+    } else {
+        return Result.Err(`Donation names for id=${id} not found`);
+    }
 }
+
+
+
+
 
 // A workaround to make the uuid package work with Azle
 globalThis.crypto = {
