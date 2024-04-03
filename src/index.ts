@@ -1,63 +1,104 @@
+import { $query, $update, Record, StableBTreeMap, Vec, match, Result, nat64, ic, Opt } from 'azle';
 import { v4 as uuidv4 } from 'uuid';
-import { Server, StableBTreeMap, ic } from 'azle';
-import express from 'express';
 
-/**
- * `donationsStorage` - it's a key-value datastructure that is used to store donations.
- * {@link StableBTreeMap} is a self-balancing tree that acts as a durable data storage that keeps data across canister upgrades.
- * For the sake of this contract we've chosen {@link StableBTreeMap} as a storage for the next reasons:
- * - `insert`, `get` and `remove` operations have a constant time complexity - O(1)
- * - data stored in the map survives canister upgrades unlike using HashMap where data is stored in the heap and it's lost after the canister is upgraded
- *
- * Brakedown of the `StableBTreeMap(string, Donation)` datastructure:
- * - the key of map is a `donationId`
- * - the value in this map is a donation itself `Donation` that is related to a given key (`donationId`)
- *
- * Constructor values:
- * 1) 0 - memory id where to initialize a map.
- */
+// Define types for DonationRecord and DonationPayload
+type DonationRecord = Record<{
+    id: string;
+    amount: number;
+    message: string;
+    donorName: string;
+    receiverName: string;
+    createdAt: nat64;
+}>
 
-/**
- This type represents a donation.
- */
-class Donation {
-   id: string;
-   amount: number;
-   donorName: string;
-   message: string;
-   createdAt: Date;
+type DonationPayload = Record<{
+    amount: number;
+    message: string;
+    donorName: string;
+    receiverName: string;
+}>
+
+// Create a map to store donation records
+const donationStorage = new StableBTreeMap<string, DonationRecord>(0, 44, 1024);
+
+// Create a map to store donor and receiver names for each donation
+const donationNamesStorage = new StableBTreeMap<string, Record<{ donorName: string; receiverName: string }>>(0, 44, 1024);
+
+$update;
+export function makeDonation(payload: DonationPayload): Result<DonationRecord, string> {
+    const record: DonationRecord = { 
+        id: uuidv4(), 
+        createdAt: ic.time(), 
+        ...payload 
+    };
+    donationStorage.insert(record.id, record);
+    // Store donor and receiver names
+    donationNamesStorage.insert(record.id, { donorName: payload.donorName, receiverName: payload.receiverName });
+    return Result.Ok(record);
 }
 
-const donationsStorage = StableBTreeMap<string, Donation>(0);
-
-export default Server(() => {
-   const app = express();
-   app.use(express.json());
-
-   app.post("/donations", (req, res) => {
-      const donation: Donation =  {id: uuidv4(), createdAt: getCurrentDate(), ...req.body};
-      donationsStorage.insert(donation.id, donation);
-      res.json(donation);
-   });
-
-   app.get("/donations", (req, res) => {
-      res.json(donationsStorage.values());
-   });
-
-   app.get("/donations/:id", (req, res) => {
-      const donationId = req.params.id;
-      const donationOpt = donationsStorage.get(donationId);
-      if ("None" in donationOpt) {
-         res.status(404).send(`the donation with id=${donationId} not found`);
-      } else {
-         res.json(donationOpt.Some);
-      }
-   });
-
-   return app.listen();
-});
-
-function getCurrentDate() {
-   const timestamp = new Number(ic.time());
-   return new Date(timestamp.valueOf() / 1000_000);
+// Function to get all donations
+$query;
+export function getAllDonations(): Result<Vec<DonationRecord>, string> {
+    return Result.Ok(donationStorage.values());
 }
+
+// Function to get total amount donated
+$query;
+export function getTotalAmountDonated(): Result<number, string> {
+    const donations = donationStorage.values();
+    const totalAmount = donations.reduce((total, donation) => total + donation.amount, 0);
+    return Result.Ok(totalAmount);
+}
+
+// Function to get recent donations
+$query;
+export function getRecentDonations(limit: number): Result<Vec<DonationRecord>, string> {
+    const donations = donationStorage.values().reverse().slice(0, limit);
+    return Result.Ok(donations);
+}
+
+// Function to get a specific donation by id
+$query;
+export function getDonation(id: string): Result<DonationRecord, string> {
+    const donationOpt = donationStorage.get(id);
+    
+    // Check if donationOpt is Some and not undefined
+    if ("Some" in donationOpt && donationOpt.Some !== undefined) {
+        const donation = donationOpt.Some as DonationRecord; // Type assertion
+        return Result.Ok(donation);
+    } else {
+        return Result.Err(`Donation with id=${id} not found`);
+    }
+}
+
+// Function to get donor and receiver names for a donation
+$query;
+export function getDonationNames(id: string): Result<Record<{ donorName: string; receiverName: string }>, string> {
+    const namesOpt = donationNamesStorage.get(id);
+    
+    // Check if namesOpt is Some and not undefined
+    if ("Some" in namesOpt && namesOpt.Some !== undefined) {
+        const names = namesOpt.Some as { donorName: string; receiverName: string }; // Type assertion
+        return Result.Ok(names);
+    } else {
+        return Result.Err(`Donation names for id=${id} not found`);
+    }
+}
+
+
+
+
+// A workaround to make the uuid package work with Azle
+globalThis.crypto = {
+    // @ts-ignore
+    getRandomValues: () => {
+        let array = new Uint8Array(32);
+
+        for (let i = 0; i < array.length; i++) {
+            array[i] = Math.floor(Math.random() * 256);
+        }
+
+        return array;
+    },
+};
